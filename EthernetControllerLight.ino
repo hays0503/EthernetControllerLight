@@ -213,6 +213,7 @@ void fnSetTime(uint32_t *time) {
 */
 void fnAddCards(char *card) {
   //Добавляем карту
+  Obj_MemoryCard->CreateCard(PATCH_TO_CARD,card);
 }
 
 /**
@@ -220,6 +221,7 @@ void fnAddCards(char *card) {
 */
 void fnDelCards(char *card) {
   //Удаляем карту
+  Obj_MemoryCard->DeleteCard(PATCH_TO_CARD,card);
 }
 
 /**
@@ -227,6 +229,7 @@ void fnDelCards(char *card) {
 */
 void fnClearCards(uint8_t *mode) {
   //Очищаем карты
+  Obj_MemoryCard->ClearCards(PATCH_TO_CARD);
 }
 
 /**
