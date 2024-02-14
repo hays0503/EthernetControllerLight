@@ -15,7 +15,7 @@ public:
 
     bool CreateCard(uint8_t* patch,uint8_t *Card);
     bool DeleteCard(uint8_t* patch,uint8_t *Card);
-    bool GetCard(uint8_t* patch,uint8_t *Card);
+    bool GetCard(uint8_t* patch,const uint8_t Card[6]);
 };
 
 MemoryCard::MemoryCard(/* args */)
@@ -69,11 +69,13 @@ bool MemoryCard::DeleteCard(uint8_t* patch,uint8_t *Card)
 /**
  * Поиск файла ключ карты
  */
-bool MemoryCard::GetCard(uint8_t* patch,uint8_t *Card)
+bool MemoryCard::GetCard(uint8_t* patch,const uint8_t Card[6])
 {
-    uint8_t* fullpatch;
-    strcat(fullpatch, patch);
-    strcat(fullpatch, Card);
+    // /CARD/67CD96
+    // /CARD/7CD96F
+
+    char* fullpatch = new char[13];
+    snprintf(fullpatch, 13, "%s%02X%02X%02X", patch, Card[3], Card[2], Card[1]);
     if (SD.exists(fullpatch))
     {
         Serial.println(F("Card exists."));

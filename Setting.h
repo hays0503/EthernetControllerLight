@@ -15,4 +15,3 @@
 #define PATCH_TO_CARD "/CARD/"
 
 #endif //SETTING_H
-

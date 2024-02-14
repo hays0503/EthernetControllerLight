@@ -1,9 +1,9 @@
 #ifndef WEBJSONLIGHT_H
 #define WEBJSONLIGHT_H
 
-#include <stdio.h>
-#include <string.h>
-#include <inttypes.h>
+// #include <stdio.h>
+// #include <string.h>
+// #include <inttypes.h>
 
 class WebJsonLightSender
 {

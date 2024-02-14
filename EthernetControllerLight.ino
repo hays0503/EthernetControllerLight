@@ -6,9 +6,8 @@
 #include "Controller.h"
 #include "LedBlinker.h"
 #include "ControllerTime.h"
-
-#define GREEN_LED A1
-#define RED_LED A2
+#include "MemoryCard.h"
+#include "Setting.h"
 
 uint8_t Active = 0;
 uint8_t Online = 0;
@@ -25,6 +24,7 @@ EthernetAdaptor Obj_EthernetAdaptor;  // <--- Адаптер для общени
 
 WebJsonLightSender Obj_WebJsonLightSender;
 WebJsonLightReceive Obj_WebJsonLightReceive;
+MemoryCard *Obj_MemoryCard;
 
 uint8_t Card[8];
 char *Ans = nullptr;
@@ -47,16 +47,19 @@ void setup() {
 
   // наш личный "setup"
   Obj_EthernetAdaptor.ConfigTCPip(
-    "192.168.0.236",
-    "192.168.0.2",
-    "255.255.252.0",
-    "AE:AD:BE:EF:FE:ED");
+    IP_CURRENT,
+    DNS_CURRENT,
+    MASK_CURRENT,
+    MAC_CURRENT);
 
   Obj_EthernetAdaptor.ConfigClient(
-    "192.168.0.34",
-    "8000");
+    IP_CLIENT,
+    PORT_CLIENT);
+
+  Obj_MemoryCard = new MemoryCard();
 
   Serial.println(F("+++End system initialize+++"));
+
 
 
 PowerOnLabel:
@@ -64,15 +67,19 @@ PowerOnLabel:
   while (Active == 0) {
     Serial.println(F("+++Send Power on+++"));
     //////////////Подача//питание//////////////////
-    char MSG[20];
+    char* MSG  = new char[20];
     uint8_t size_msg = Obj_WebJsonLightSender.Power_On(MSG, 1111, Active, Mode);
     if (Obj_EthernetAdaptor.Post(MSG, size_msg, Ans, Ans_size_msg) != -1) {
+      delete MSG;
+      MSG = nullptr;
       Serial.println(F("+++Parse answer+++"));
       if (Obj_WebJsonLightReceive.Search(Ans, fnSetActive)) {
         Serial.println(F("+++OK+++"));
       }
       delay(3000);
     } else {
+      delete MSG;
+      MSG = nullptr;
       Serial.println(F("RED_LED0"));
       LedBlinker::LedBlinkerSOS(RED_LED);
     }
@@ -96,8 +103,11 @@ PowerOnLabel:
 
         /////////////Событие///////////////////////////
         if (!Online) {
+          if(Obj_MemoryCard->GetCard(PATCH_TO_CARD,Card)){
+              Serial.println(F("+++fnOpenDoor+++"));
+              fnOpenDoor(Card, &Reader);
+          }
 
-          fnOpenDoor(Card, &Reader);
 
           delete Ans;     // Очищаем для следующего ответа
           Ans = nullptr;  // Очищаем для следующего ответа
@@ -107,10 +117,12 @@ PowerOnLabel:
         else
         /////////////Проверка//на//доступ////////////////////////////
         {
-          char MSG[14];
+          char* MSG = new char[14];
           uint8_t size_msg = Obj_WebJsonLightSender.Check_access(MSG, Card, Reader);
           if (Obj_EthernetAdaptor.Post(MSG, size_msg, Ans, Ans_size_msg) != -1)
           {
+            delete MSG;
+            MSG = nullptr;
             Obj_WebJsonLightReceive.Search(
               Ans,
               fnSetActive,   // Активировать контроллер
@@ -123,6 +135,8 @@ PowerOnLabel:
               fnOpenDoor     // Открыть дверь
             );
           }else{
+            delete MSG;
+            MSG = nullptr;
             Serial.println(F("RED_LED1"));
             LedBlinker::LedBlinkerSOS(RED_LED);
           }
@@ -133,10 +147,12 @@ PowerOnLabel:
 
       if (true) {
         Serial.println(F("!!!!!!!!!!!!!!!!!!PING!!!!!!!!!!!!!!!!!!!!"));
-        char MSG[8];
+        char* MSG = new char[8];
         uint8_t size_msg = Obj_WebJsonLightSender.Ping(MSG, Active, Mode);
         if (Obj_EthernetAdaptor.Post(MSG, size_msg, Ans, Ans_size_msg) != -1)
         {
+          delete MSG;
+          MSG = nullptr;
           ////////////////////////////////////////////////////
           Obj_WebJsonLightReceive.Search(
                 Ans,

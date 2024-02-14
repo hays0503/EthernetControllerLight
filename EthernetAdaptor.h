@@ -24,7 +24,7 @@ public:
   int pClientPort;
   EthernetClient client;
 
-  char strIpClient[15];
+  // char strIpClient[15];
 
   /**
    * \brief Отправка пакета post

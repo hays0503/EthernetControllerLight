@@ -1,4 +1,5 @@
 #include "EthernetAdaptor.h"
+#include "Check_memory.h"
 
 uint8_t EthernetAdaptor::SendTo() {
   return 0;
@@ -30,23 +31,11 @@ void StrToMac(const char *macStr, uint8_t macArray[]) {
     // Переходим к следующему блоку
     macStr += 2;
   }
-  //  Serial.print("Parse string = ");
-  //  //"DE:AD:BE:EF:FE:ED"
-  //  for (uint8_t i = 0; i < 6; i++)
-  //  {
-  //      Serial.print(macArray[i],16);
-  //      if (i < 6 - 1)
-  //      {
-  //          Serial.print(':');
-  //      }
-  //
-  //  }
-  //  Serial.print('\n');
+
 };
 
 void StrToIpAddress(const char *Ip, IPAddress &pIp) {
   int StrLen = strlen(Ip);
-  //    Serial.println(StrLen);
   uint8_t number = 0;
   uint8_t place_number = 1;
   uint8_t NumberOctet = 0;
@@ -68,15 +57,7 @@ void StrToIpAddress(const char *Ip, IPAddress &pIp) {
       Octet[NumberOctet] = number;
     }
   }
-  //  Serial.print("Parse string = ");
-  //  Serial.print(Octet[3]);
-  //  Serial.print('.');
-  //  Serial.print(Octet[2]);
-  //  Serial.print('.');
-  //  Serial.print(Octet[1]);
-  //  Serial.print('.');
-  //  Serial.print(Octet[0]);
-  //  Serial.print('\n');
+
 
   pIp[0] = Octet[3];
   pIp[1] = Octet[2];
@@ -91,19 +72,19 @@ uint8_t EthernetAdaptor::ConfigTCPip(
   const char *Mac) {
 
 
-   Serial.println("+++Set Ip+++");
+  Serial.println(F("+++Set Ip+++"));
   StrToIpAddress(IpCurrent, this->pMyIp);
 
-   Serial.println("+++Set Dns+++");
+   Serial.println(F("+++Set Dns+++"));
   StrToIpAddress(Dns, this->pMyDns);
 
-   Serial.println("+++Set Mask+++");
+   Serial.println(F("+++Set Mask+++"));
   StrToIpAddress(Mask, this->pMyMask);
 
-   Serial.println("+++Set Mac+++");
+   Serial.println(F("+++Set Mac+++"));
   StrToMac(Mac, MyMac);
 
-   Serial.println("+++Set Ethernet.begin+++");
+   Serial.println(F("+++Set Ethernet.begin+++"));
 
   Ethernet.begin(
     MyMac,
@@ -112,44 +93,50 @@ uint8_t EthernetAdaptor::ConfigTCPip(
     pMyMask);
 
    delay(1000);
-   Serial.print("My IP address: ");
+   Serial.print(F("My IP address: "));
    Serial.println(Ethernet.localIP());
   
-   Serial.print("My gateway IP: ");
+   Serial.print(F("My gateway IP: "));
    Serial.println(Ethernet.gatewayIP());
   
-   Serial.print("My dns Server IP: ");
+   Serial.print(F("My dns Server IP: "));
    Serial.println(Ethernet.dnsServerIP());
   
-   Serial.print("My subnet Mask: ");
+   Serial.print(F("My subnet Mask: "));
    Serial.println(Ethernet.subnetMask());
   
    // give the Ethernet shield a second to initialize:
-   Serial.println("Ethernet shield initialize.......");
+   Serial.println(F("Ethernet shield initialize......."));
 
 
   return 0;
 };
 
 uint8_t EthernetAdaptor::ConfigClient(const char *IpClient, const char *Port) {
-  uint8_t sizeIp = strlen(IpClient);
-  for (uint8_t i = 0; i < sizeIp; i++) {
-    strIpClient[i] = IpClient[i];
-  }
+  // uint8_t sizeIp = strlen(IpClient);
+  // for (uint8_t i = 0; i < sizeIp; i++) {
+  //   strIpClient[i] = IpClient[i];
+  // }
 
   StrToIpAddress(IpClient, this->pClientIp);
 
   this->pClientPort = String(Port).toInt();
 
-   Serial.print("IpClient: ");
+   Serial.print(F("IpClient: "));
    Serial.println(IpClient);
-   Serial.print("Client Port: ");
+   Serial.print(F("Client Port: "));
    Serial.println(pClientPort);
 
   return 0;
 }
 
 int8_t EthernetAdaptor::Post(const char *Body, uint8_t size, char *&Answer, uint16_t &Answer_size) {
+
+
+  Serial.print(F("ID = 0 SPACE FREE = "));
+  Serial.print(memoryFree());
+  Serial.print('\n');
+
 
   if (!client.connect(this->pClientIp, this->pClientPort)) {
     Serial.println(F("Connection to client failed"));
@@ -166,7 +153,7 @@ int8_t EthernetAdaptor::Post(const char *Body, uint8_t size, char *&Answer, uint
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Отправляем Пакет
     client.print(F("Body: "));
-    for (int sumbol = 0; sumbol < size; sumbol++) {
+    for (uint8_t sumbol = 0; sumbol < size; sumbol++) {
       Serial.print(Body[sumbol]);
       client.print(Body[sumbol]);
     }
@@ -184,14 +171,27 @@ int8_t EthernetAdaptor::Post(const char *Body, uint8_t size, char *&Answer, uint
     }
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Проверка статуса запроса
-    char status[32] = { 0 };
-    client.readBytesUntil('\r', status, sizeof(status));
-    if (strcmp(status, "HTTP/1.1 200 OK") != 0) {
-      Serial.print(F("Unexpected response: "));
-      Serial.println(status);
-      client.stop();
-      return -1;
+
+    Serial.print(F("ID = 1 SPACE FREE = "));
+    Serial.print(memoryFree());
+    Serial.print('\n');
+
+    if(true)
+    {
+        char status[32] = { 0 };
+        client.readBytesUntil('\r', status, sizeof(status));
+        if (strcmp(status, "HTTP/1.1 200 OK") != 0) {
+        Serial.print(F("Unexpected response: "));
+        Serial.println(status);
+        client.stop();
+        return -1;
+      }
     }
+
+    Serial.print(F("ID = 2 SPACE FREE = "));
+    Serial.print(memoryFree());
+    Serial.print('\n');
+
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Поиск размера сообщение
     if (!client.find("content-length: ")) {
@@ -216,10 +216,18 @@ int8_t EthernetAdaptor::Post(const char *Body, uint8_t size, char *&Answer, uint
     }
     ///////////////////////////////////////////////////////////////////////////////////////////
     //Читаем ответ
-
+    Serial.print(F("ID = 3 SPACE FREE = "));
+    Serial.print(memoryFree());
+    Serial.print('\n');
     //Выделяем память под ответ
     Answer = new char[Answer_size+1];
+    Serial.print(F("ID = 4 SPACE FREE = "));
+    Serial.print(memoryFree());
+    Serial.print('\n');
     uint16_t i = 0;
+    Serial.print(F("ID = 5 SPACE FREE = "));
+    Serial.print(memoryFree());
+    Serial.print('\n');
     while (client.connected()) {
       if (client.available()) {
         char c = client.read();
@@ -230,6 +238,9 @@ int8_t EthernetAdaptor::Post(const char *Body, uint8_t size, char *&Answer, uint
         
       }
     }
+    Serial.print(F("ID = 6 SPACE FREE = "));
+    Serial.print(memoryFree());
+    Serial.print('\n');
     Answer[Answer_size]='\0';
     ///////////////////////////////////////////////////////////////////////////////////////////
     Serial.print('\n');
