@@ -1,0 +1,235 @@
+
+#include <Arduino.h>
+#include <SPI.h>
+#include "WebJsonLight.h"
+#include "EthernetAdaptor.h"
+#include "Controller.h"
+#include "LedBlinker.h"
+#include "ControllerTime.h"
+
+#define GREEN_LED A1
+#define RED_LED A2
+
+uint8_t Active = 0;
+uint8_t Online = 0;
+uint8_t Mode = 0;
+uint8_t Reader = 0;
+
+
+ThreeWire myWire(7, 6, 8);  // Указываем вывода IO, SCLK, CE
+RtcDS1302<ThreeWire> Rtc(myWire);
+
+Matrix *MatrixArr[2];  // <--- Считыватели
+
+EthernetAdaptor Obj_EthernetAdaptor;  // <--- Адаптер для общение
+
+WebJsonLightSender Obj_WebJsonLightSender;
+WebJsonLightReceive Obj_WebJsonLightReceive;
+
+uint8_t Card[8];
+char *Ans = nullptr;
+uint16_t Ans_size_msg = 0;
+
+
+void setup() {
+  pinMode(GREEN_LED, OUTPUT);
+  pinMode(RED_LED, OUTPUT);
+  Serial.begin(9600);
+
+  MatrixArr[0] = new Matrix(2);
+  MatrixArr[1] = new Matrix(3);
+  Rtc.Begin();
+
+
+  Serial.println(F("+++System start+++"));
+
+  Serial.println(F("+++System initialize+++"));
+
+  // наш личный "setup"
+  Obj_EthernetAdaptor.ConfigTCPip(
+    "192.168.0.236",
+    "192.168.0.2",
+    "255.255.252.0",
+    "AE:AD:BE:EF:FE:ED");
+
+  Obj_EthernetAdaptor.ConfigClient(
+    "192.168.0.34",
+    "8000");
+
+  Serial.println(F("+++End system initialize+++"));
+
+
+PowerOnLabel:
+
+  while (Active == 0) {
+    Serial.println(F("+++Send Power on+++"));
+    //////////////Подача//питание//////////////////
+    char MSG[20];
+    uint8_t size_msg = Obj_WebJsonLightSender.Power_On(MSG, 1111, Active, Mode);
+    if (Obj_EthernetAdaptor.Post(MSG, size_msg, Ans, Ans_size_msg) != -1) {
+      Serial.println(F("+++Parse answer+++"));
+      if (Obj_WebJsonLightReceive.Search(Ans, fnSetActive)) {
+        Serial.println(F("+++OK+++"));
+      }
+      delay(3000);
+    } else {
+      Serial.println(F("RED_LED0"));
+      LedBlinker::LedBlinkerSOS(RED_LED);
+    }
+
+    delete Ans;
+    Ans = nullptr;
+
+    ///////////////////////////////////////////////
+  }
+
+  for (;;) {
+    // наш личный "loop"
+
+    for (Reader = 0; Reader < 2; Reader++) {
+
+      // Проверить Считыватель
+      if (MatrixArr[Reader]->Read()) {
+        ///////////////////////////////////////////////
+        // Считыватель
+        MatrixArr[Reader]->getCard(Card);  // Тут мы забрали ключ
+
+        /////////////Событие///////////////////////////
+        if (!Online) {
+
+          fnOpenDoor(Card, &Reader);
+
+          delete Ans;     // Очищаем для следующего ответа
+          Ans = nullptr;  // Очищаем для следующего ответа
+
+        }
+        ///////////////////////////////////////////////
+        else
+        /////////////Проверка//на//доступ////////////////////////////
+        {
+          char MSG[14];
+          uint8_t size_msg = Obj_WebJsonLightSender.Check_access(MSG, Card, Reader);
+          if (Obj_EthernetAdaptor.Post(MSG, size_msg, Ans, Ans_size_msg) != -1)
+          {
+            Obj_WebJsonLightReceive.Search(
+              Ans,
+              fnSetActive,   // Активировать контроллер
+              fnSetMode,     // Установить режим котроллера
+              fnSetTime,     // Установить время в контроллере
+              fnAddCards,    // Добавить карту в контроллер
+              fnDelCards,    // Удалить карту из контроллера
+              fnClearCards,  // Удалить все карты
+              fnCheckAcess,  // Побочные действия на 2 факторную аунтификацию
+              fnOpenDoor     // Открыть дверь
+            );
+          }else{
+            Serial.println(F("RED_LED1"));
+            LedBlinker::LedBlinkerSOS(RED_LED);
+          }
+        }
+        ///////////////////////////////////////////////
+      }
+      //////////////Пинг//////////////////////////////
+
+      if (true) {
+        Serial.println(F("!!!!!!!!!!!!!!!!!!PING!!!!!!!!!!!!!!!!!!!!"));
+        char MSG[8];
+        uint8_t size_msg = Obj_WebJsonLightSender.Ping(MSG, Active, Mode);
+        if (Obj_EthernetAdaptor.Post(MSG, size_msg, Ans, Ans_size_msg) != -1)
+        {
+          ////////////////////////////////////////////////////
+          Obj_WebJsonLightReceive.Search(
+                Ans,
+                fnSetActive,   // Активировать контроллер
+                fnSetMode,     // Установить режим котроллера
+                fnSetTime,     // Установить время в контроллере
+                fnAddCards,    // Добавить карту в контроллер
+                fnDelCards,    // Удалить карту из контроллера
+                fnClearCards,  // Удалить все карты
+                fnCheckAcess,  // Побочные действия на 2 факторную аунтификацию
+                fnOpenDoor     // Открыть дверь
+                );
+          if (Active == 0) {
+            goto PowerOnLabel;
+          }
+
+        } else {
+          Serial.println(F("RED_LED2"));
+          LedBlinker::LedBlinkerSOS(RED_LED);
+        }
+        ////////////////////////////////////////////////////
+        delete Ans;
+        Ans = nullptr;
+      }
+
+      ///////////////////////////////////////////////
+    }
+  }
+};
+
+void loop(){};
+
+
+/**
+ * \brief Активировать контроллер
+*/
+void fnSetActive(uint8_t *active, uint8_t *online) {
+  Active = *active;
+  Online = *online;
+}
+
+/**
+ * \brief Установить режим котроллера
+*/
+void fnSetMode(uint8_t *mode) {
+  Mode = *mode;
+}
+
+/**
+ * \brief Установить время в контроллере 
+*/
+void fnSetTime(uint32_t *time) {
+  setTimeController(&Rtc, time);
+}
+
+/**
+ * \brief Добавить карту в контроллер
+*/
+void fnAddCards(char *card) {
+  //Добавляем карту
+}
+
+/**
+ * \brief Удалить карту из контроллера
+*/
+void fnDelCards(char *card) {
+  //Удаляем карту
+}
+
+/**
+ * \brief Удалить все карты
+*/
+void fnClearCards(uint8_t *mode) {
+  //Очищаем карты
+}
+
+/**
+ * \brief Открыть дверь
+*/
+void fnOpenDoor(uint8_t *card, uint8_t *reader) {
+  //Индикация открытия
+  LedBlinker::LedBlinkerPulse(GREEN_LED);
+
+  ////////////////////////Ответ///////////////////////////////
+  char MSG[26];
+  uint8_t size_msg = Obj_WebJsonLightSender.Event(MSG, 4, card, *reader, getTimeController(&Rtc));
+  Obj_EthernetAdaptor.Post(MSG, size_msg, Ans, Ans_size_msg);
+  /////////////////////////////////////////////////////////////////////////////////
+}
+
+/**
+ * \brief Побочные действия на 2 факторную аунтификацию
+*/
+void fnCheckAcess(uint8_t *confirm) {
+  fnOpenDoor(Card, &Reader);
+}
